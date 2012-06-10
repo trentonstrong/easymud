@@ -27,7 +27,7 @@ def dispatch(session, command_text):
 
 def move(cmd, session):
     direction = cmd
-    mobile = session.world.get_manager('mobile')
+    mobile = session.world.get_system('mobile')
     moved = mobile.move(session.player, direction)
     if not moved:
         session.display('You cannot go %s' % direction)

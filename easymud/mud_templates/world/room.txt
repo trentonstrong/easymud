@@ -1,5 +1,3 @@
 {{ room.title|color('cyan') -}}
 {{ room.description -}}
-{% for exit in room.exits %}
-{{ exit[0] }} - {{ exit[1] }}
-{% endfor %}
+Exits: {% for exit in room.exits -%}{{ exit[0] }}{% endfor %}

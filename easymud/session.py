@@ -8,7 +8,6 @@ import jinja2
 from jinja2 import contextfilter
 
 ANSI_RESET = '\033[0m'
-
 ANSI_COLORS = {
     'black':            ('#000000', '\033[30m', '\033[40m'),
     'red':              ('#cd0000', '\033[31m', '\033[41m'),
@@ -43,7 +42,7 @@ def color_filter(context, text, color, bgcolor=None):
             bgcolor = ''
         return "[[;%s;%s;]%s]" % (color, bgcolor, text)
 
-    elif device == 'terminal':
+    elif device == 'telnet':
         color = color[1]
         if bgcolor is not None:
             color = color + bgcolor[1]
@@ -74,12 +73,12 @@ class Session(object):
         self.socket = socket
         self.world = world
         self.player = self.world.create_entity() \
-            .add_component('mobile', {'room': self.world.root}) \
-            .add_component('player', {'session': self})
+            .add_component('mobile', room=self.world.root) \
+            .add_component('player', session=self)
 
     def start(self):
         mobile = self.player.get_component('mobile')
-        self.display_room(mobile.get('room'))
+        self.display_room(mobile.room)
 
     def display(self, text):
         return self.socket.write_message(text)
@@ -92,5 +91,5 @@ class Session(object):
         return self.display_template('world/room.txt', {'room': room})
 
     def prompt(self, text, callback):
-        self.display(text, 'red')
+        self.display(text)
         self.prompt = (text, callback)

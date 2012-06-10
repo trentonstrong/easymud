@@ -10,13 +10,14 @@ entities.
 
 import logging
 from uuid import uuid4 as uuid
+from recordtype import recordtype
 
 
 class World(object):
     def __init__(self, definition):
         self.validate(definition)
         self.build(definition)
-        self.initialize_managers()
+        self.initialize_systems()
         self.entities = {}
         self.current_tick = 0
 
@@ -47,18 +48,18 @@ class World(object):
         """
         self.current_tick = self.current_tick + 1
         logging.info("Tick: %d" % self.current_tick)
-        for component, manager in self.managers.items():
+        for component, system in self.systems.items():
             logging.info("Running on_tick for %s" % component)
-            manager.on_tick()
+            system.on_tick()
             logging.info("Finished on_tick for %s" % component)
         pass
 
-    def initialize_managers(self):
-        self.managers = dict([(component, manager(self)) for component, manager
-                              in component_managers.items()])
+    def initialize_systems(self):
+        self.systems = dict([(component, system(self)) for component, system
+                              in component_systems.items()])
 
-    def get_manager(self, component):
-        return self.managers[component]
+    def get_system(self, component):
+        return self.systems[component]
 
     @property
     def root(self):
@@ -92,8 +93,8 @@ class Room(object):
     @property
     def exits(self):
         if self.exit_dict is None:
-            return ()
-        return ((exit_dir, self.world.get_room(exit_id)) for exit_dir, exit_id in self.exit_dict.items())
+            return None
+        return self.exit_dict.keys()
 
     def __unicode__(self):
         return self.title
@@ -112,24 +113,24 @@ class Entity(object):
         self.listeners = {}
         self.components = []
 
-    def add_component(self, component, attrs={}):
+    def add_component(self, component, **kwargs):
         if component not in self.components:
             self.components.append(component)
-            manager = self.world.get_manager(component)
-            manager.register(self, attrs)
+            system = self.world.get_system(component)
+            system.register(self, **kwargs)
         return self
 
     def remove_component(self, component):
         if component in self.components:
             self.components.remove(component)
-            manager = self.world.get_manager(component)
-            manager.unregister(self)
+            system = self.world.get_system(component)
+            system.unregister(self)
         return self
 
     def get_component(self, component):
         if component in self.components:
-            manager = self.world.get_manager(component)
-            return manager.get_attrs(self)
+            system = self.world.get_system(component)
+            return system.get_component(self)
         return None
 
     def has_component(self, component):
@@ -160,37 +161,38 @@ class Entity(object):
 
 ### COMPONENTS ###
 
-component_managers = {}
+component_systems = {}
 
 
-def register_component_manager(name, manager):
-    component_managers[name] = manager
+def register_component_system(name, system):
+    component_systems[name] = system
 
 
-class ComponentManagerMetaclass(type):
+class ComponentSystemMetaclass(type):
     def __new__(cls, clsname, bases, attrs):
-        klass = super(ComponentManagerMetaclass, cls).__new__(cls, clsname, bases, attrs)
-        if clsname == "ComponentManager":
+        klass = super(ComponentSystemMetaclass, cls).__new__(cls, clsname, bases, attrs)
+        if clsname == "ComponentSystem":
             return klass
         component = attrs.get('component')
         if component is None:
-            raise TypeError("'component' not defined for component manager %s" % clsname)
-        register_component_manager(component, klass)
+            raise TypeError("'component' not defined for component system %s" % clsname)
+        register_component_system(component, klass)
         return klass
 
 
-class ComponentManager(object):
-    __metaclass__ = ComponentManagerMetaclass
+class ComponentSystem(object):
+    __metaclass__ = ComponentSystemMetaclass
 
     component = None
 
-    requires = []
+    attributes = []
 
-    defaults = {}
+    requires = []
 
     def __init__(self, world):
         self.entities = {}
         self.world = world
+        self.record = recordtype(self.__class__.component, self.__class__.attributes)
         self.initialize()
 
     def initialize(self):
@@ -199,20 +201,17 @@ class ComponentManager(object):
     def on_tick(self):
         pass
 
-    def register(self, entity, attrs):
+    def register(self, entity, **kwargs):
         if entity.id not in self.entities:
             for required_component in self.__class__.requires:
                 entity.add_component(required_component)
-            merge = self.__class__.defaults.copy()
-            merge.update(attrs)
-            self.set_attrs(entity, merge)
+            self.entities[entity.id] = self.record(**kwargs)
             self.on_register(entity)
 
     def on_register(self, entity):
         pass
 
     def unregister(self, entity):
-        # TODO: Unload components required by this component
         if entity.id in self.entities:
             del self.entities[entity.id]
             self.on_unregister(entity)
@@ -220,43 +219,33 @@ class ComponentManager(object):
     def on_unregister(self, entity):
         pass
 
-    def get_attrs(self, entity):
+    def get_component(self, entity):
         return self.entities[entity.id]
 
-    def set_attrs(self, entity, attrs):
-        self.entities[entity.id] = attrs
 
-    def get(self, entity, attr):
-        if entity.id in self.entities:
-            return self.entities[entity.id].get(attr)
-        return None
-
-    def set(self, entity, attr, value):
-        if entity.id in self.entities:
-            self.entities[entity.id][attr] = value
-
-
-class PlayerComponentManager(ComponentManager):
+class PlayerComponentSystem(ComponentSystem):
     component = "player"
 
     requires = ['mobile']
 
-    defaults = {
-        'session': None
-    }
+    attributes = [('session', None)]
+
 
     def on_register(self, entity):
         entity.add_handler("moved", self.player_moved)
         # add session to entity for convenience
-        entity.session = self.get(entity, 'session')
+        player = self.get_component(entity)
+        entity.session = player.session
 
     def player_moved(self, entity, data=None):
         room = data['room']
         entity.session.display_room(room)
 
 
-class MobileComponentManager(ComponentManager):
+class MobileComponentSystem(ComponentSystem):
     component = 'mobile'
+
+    attributes = ['room']
 
     defaults = {
         'room': 'root'
@@ -266,10 +255,11 @@ class MobileComponentManager(ComponentManager):
         entity.add_handler("move", self.move)
 
     def move(self, entity, direction):
-        room = self.get(entity, 'room')
+        mobile = self.get_component(entity)
+        room = mobile.room
         if room.get_exit(direction):
-            self.set(entity, 'room', room.get_exit(direction))
+            mobile.room = room.get_exit(direction)
             entity.send("moved", {
-                'room': room.get_exit(direction)})
+                'room': mobile.room})
             return True
         return False

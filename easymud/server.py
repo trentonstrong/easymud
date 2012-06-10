@@ -62,6 +62,7 @@ class RootHandler(tornado.web.RequestHandler):
 
 class SocketHandler(tornado.websocket.WebSocketHandler):
     def open(self):
+        logging.info("Connected: websocket")
         self.device = 'web'
         self.session = Session(self, world)
         self.session.start()
@@ -72,8 +73,8 @@ class SocketHandler(tornado.websocket.WebSocketHandler):
 
 class MudTelnetProtocol(StatefulTelnetProtocol):
     def connectionMade(self):
-        logging.info("connectionMade")
-        self.device = 'terminal'
+        logging.info("Connected: telnet")
+        self.device = 'telnet'
         self.session = Session(self, world)
         self.session.start()
 
