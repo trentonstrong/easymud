@@ -142,9 +142,9 @@ class Entity(object):
             self.add_component(component)
         return self
 
-    def send(self, message, data=None):
+    def send(self, message, **kwargs):
         for listener in self.listeners.get(message):
-            listener(self, data)
+            listener(self, **kwargs)
 
     def add_handler(self, message, handler):
         listeners = self.listeners.get(message, [])
@@ -237,9 +237,10 @@ class PlayerComponentSystem(ComponentSystem):
         player = self.get_component(entity)
         entity.session = player.session
 
-    def player_moved(self, entity, data=None):
-        room = data['room']
-        entity.session.display_room(room)
+    def player_moved(self, entity, **kwargs):
+        if 'room' in kwargs:
+            room = kwargs['room']
+            entity.session.display_room(room)
 
 
 class MobileComponentSystem(ComponentSystem):
@@ -259,7 +260,32 @@ class MobileComponentSystem(ComponentSystem):
         room = mobile.room
         if room.get_exit(direction):
             mobile.room = room.get_exit(direction)
-            entity.send("moved", {
-                'room': mobile.room})
+            entity.send("moved", room=mobile.room)
             return True
         return False
+
+class HealthComponentSystem(ComponentSystem):
+    component = 'health'
+
+    attributes = ['hp', 'hp_max', 'hp_regen']
+
+    defaults = {
+        'hp_max': 100,
+        'hp': 100,
+        'hp_regen': 10,
+        'is_dead': False
+    }
+
+    def on_register(self, entity):
+        pass
+
+    def on_tick(self, entity):
+        for entity, health in self.entities.items():
+            # don't regen dead or fully healed entities
+            if health.hp == health.hp_max or health.is_dead:
+                continue
+
+            if (health.hp + health.hp_regen) > health.hp_max:
+                health.hp += (health.hp_max - health.hp)
+            else:    
+                health.hp += health.hp_regen

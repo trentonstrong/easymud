@@ -13,17 +13,19 @@ def parse_command(text):
 
 def dispatch(session, command_text):
     if not command_text:
+        session.display_prompt()
         return None
     (command, args) = parse_command(command_text)
     command_matches = commands.retrieve(command + '*')
     if not command_matches:
         session.display("You don't remember how to %s" % command)
+        session.display_prompt()
         return None
     first_match = command_matches[0]
     command = first_match[0]
     command_func = first_match[1]
-    return command_func(command, session, *args)
-
+    result = command_func(command, session, *args)
+    return result
 
 def move(cmd, session):
     direction = cmd

@@ -83,8 +83,6 @@ class MudTelnetProtocol(StatefulTelnetProtocol):
         dispatch(self.session, line.strip())
 
     def write_message(self, message):
-        if not message.endswith('\r\n'):
-            message = message + '\r\n'
         self.transport.write(str(message))
         self.clearLineBuffer()
 

@@ -81,15 +81,15 @@ class Session(object):
         self.display_room(mobile.room)
 
     def display(self, text):
-        return self.socket.write_message(text)
+        self.socket.write_message(text)
+        self.display_prompt()
 
     def display_template(self, template, context={}):
         context['device'] = self.socket.device
-        return self.display(render_template(template, context))
+        self.display(render_template(template, context))
 
     def display_room(self, room):
-        return self.display_template('world/room.txt', {'room': room})
+        self.display_template('world/room.txt', {'room': room})
 
-    def prompt(self, text, callback):
-        self.display(text)
-        self.prompt = (text, callback)
+    def display_prompt(self):
+        self.socket.write_message("\r\n<100/100>")

@@ -43,10 +43,15 @@
     var ws = new WebSocket("ws://localhost:8888/socket");
     var terminal = $('#container').terminal(function(command, terminal) {
       ws.send(command);
-    }, { prompt: '>', name: 'mud', greetings: ''});
+    }, { prompt: '', name: 'mud', greetings: ''});
     ws.onmessage = function(message) {
       console.log(message.data);
-      terminal.echo(message.data);
+      if (message.data.match(/<(\d+\/\d+\w+)+>/g)) {
+        terminal.echo('\n');
+        terminal.set_prompt($.trim(message.data));
+      } else {
+        terminal.echo(message.data);
+      }
     };
 
   </script>
