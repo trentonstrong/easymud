@@ -73,12 +73,11 @@ class Session(object):
         self.socket = socket
         self.world = world
         self.player = self.world.create_entity() \
-            .add_component('mobile', room=self.world.root) \
-            .add_component('player', session=self)
+            .add_component('player', 
+                session=self,)
 
     def start(self):
-        mobile = self.player.get_component('mobile')
-        self.display_room(mobile.room)
+        self.display_room(self.player.room)
 
     def display(self, text):
         self.socket.write_message(text)
@@ -93,3 +92,9 @@ class Session(object):
 
     def display_prompt(self):
         self.socket.write_message("\r\n<100/100>")
+
+    def display_entity_arrived(self, room, entity, **kwargs):
+        self.display("%s has arrived." % entity)
+
+    def display_entity_left(self, room, entity, direction, **kwargs):
+        self.display("%s leaves towards the %s" % (entity, direction))

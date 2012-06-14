@@ -29,10 +29,10 @@ def dispatch(session, command_text):
 
 def move(cmd, session):
     direction = cmd
-    mobile = session.world.get_system('mobile')
-    moved = mobile.move(session.player, direction)
+    room = session.player.room
+    moved, reason = session.player.move(direction)
     if not moved:
-        session.display('You cannot go %s' % direction)
+        session.display(reason)
     return True
 
 
