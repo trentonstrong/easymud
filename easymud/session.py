@@ -73,8 +73,7 @@ class Session(object):
         self.socket = socket
         self.world = world
         self.player = self.world.create_entity() \
-            .add_component('player', 
-                session=self,)
+            .add_component('player', session=self)
 
     def start(self):
         self.display_room(self.player.room)
@@ -91,7 +90,8 @@ class Session(object):
         self.display_template('world/room.txt', {'room': room})
 
     def display_prompt(self):
-        self.socket.write_message("\r\n<100/100>")
+        health = self.player.get_component("health")
+        self.socket.write_message("\r\n<%(hp)d/%(hp_max)dhp>" % health._asdict())
 
     def display_entity_arrived(self, room, entity, **kwargs):
         self.display("%s has arrived." % entity)

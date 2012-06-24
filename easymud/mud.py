@@ -144,7 +144,7 @@ class Room(object):
 class Entity(object):
     def __init__(self, world):
         self.dispatcher = EventDispatcher(self)
-        self.id = uuid()
+        self.id = str(uuid())
         self.world = world
         self.components = []
 

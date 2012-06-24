@@ -18,6 +18,8 @@ tornado.platform.twisted.install()
 from twisted.internet import reactor
 from twisted.internet.protocol import ServerFactory, Protocol
 from twisted.conch.telnet import StatefulTelnetProtocol
+from twisted.conch import manhole, manhole_ssh
+from twisted.cred import portal, checkers
 
 from commands import dispatch
 from mud import World
@@ -27,7 +29,7 @@ define("port", default=8888, help="run websocket handler on the given port", typ
 define("telnetport", default=4000, help="run telnet handler ont he given port", type=int)
 define("world", default="world", help="path to world definition file", type=str)
 define("debug", default=False, help="run server in debug mode with autoreloading", type=bool)
-define("tick", default=60, help="tick interval in seconds", type=int)
+define("tick", default=3, help="tick interval in seconds", type=int)
 
 """
 Woohoo!  A big giant global world object.  Don't worry, other modules aren't
@@ -87,7 +89,16 @@ class MudTelnetProtocol(StatefulTelnetProtocol):
         self.clearLineBuffer()
 
     def connectionLost(self, reason):
-        logging.debug("DEBUG: connectionLost called with: %s" % str(reason))
+        logging.debug("DEBUG: called connectionLost with: %s" % str(reason))
+
+def getManholeFactory(namespace, **passwords):
+    realm = manhole_ssh.TerminalRealm() 
+    realm.chainedProtocolFactory.protocolFactory = lambda _: manhole.Manhole(namespace)
+    p = portal.Portal(realm)
+    p.registerChecker(
+        checkers.InMemoryUsernamePasswordDatabaseDontUse(**passwords))
+    f = manhole_ssh.ConchFactory(p) 
+    return f
 
 
 def main():
@@ -107,13 +118,18 @@ def main():
     factory.protocol = MudTelnetProtocol
     reactor.listenTCP(options.telnetport, factory)
 
+    # init Tornado app
+    app = Application()
+    app.listen(options.port)
+
     # configure tick interrupt
     ticker = tornado.ioloop.PeriodicCallback(world.tick, options.tick * 1000)
     ticker.start()
 
-    # start the server!
-    app = Application()
-    app.listen(options.port)
+    # configure admin debug server
+    reactor.listenTCP(2222, getManholeFactory(globals(), admin='admin'))
+
+    # start the server(s)
     logging.info("Listening on port %d" % options.port)
     tornado.ioloop.IOLoop.instance().start()
 
